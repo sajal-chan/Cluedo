@@ -4,16 +4,18 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 
 const app = express();
+const httpServer = http.createServer(app);
 
 // Add JSON parsing middleware
 app.use(express.json());
 
 // Add CORS middleware
 app.use(cors({
-  origin: 'http://localhost:3000', // Frontend typically runs on port 3000, not 5000
+  origin: 'http://localhost:3000', 
   methods: ['GET', 'POST'],
   credentials: true
 }));
+
 
 // Map to track rooms and number of users
 const roomMap = new Map();
@@ -46,8 +48,6 @@ app.post('/joinRoom', (req, res) => {
   res.status(200).json("The user has joined the room");
 });
 
-// Server setup
-const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: 'http://localhost:3000',
@@ -56,8 +56,19 @@ const io = new Server(httpServer, {
   }
 });
 
-io.on('connection', (socket) => {
-  // socket handling logic here
+io.on("connection", (socket) => {
+  console.log("Client connected:", socket.id);
+
+
+  socket.on("create room", (roomID) => {
+      socket.join(roomID); 
+      socket.emit("assign-admin");
+      console.log(` Room ${roomID} created and socket ${socket.id} joined it`);
+  });
+  socket.on("join room",(roomID)=>{
+    socket.join(roomID);
+    console.log(`client with socket id ${socket.id} has joined the room with ID: ${roomID}`);
+  })
 });
 
 httpServer.listen(5000, () => {

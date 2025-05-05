@@ -1,12 +1,27 @@
 'use client'
-import { useState } from 'react';
+import { useState,useEffect } from 'react';
+import {socket} from './socket';
+import {io} from 'socket.io-client';
+
 
 export default function App() {
   const [roomID, setRoomID] = useState('');
-  
+  let adminID=-1;
+
   const handleChange = (e) => {
-    setRoomID(e.target.value); // Fixed: use e.target.value instead of e.value
+    setRoomID(e.target.value); 
   };
+
+  useEffect(() => {
+
+    socket.on("connect", () => {
+      console.log("Connected to server with ID:", socket.id);
+    });
+    return () => {
+      socket.off("connect");
+    };
+
+  }, []);//only makes a new connection on the page re-render
 
   const createRoom = async () => {
     try {
@@ -20,7 +35,12 @@ export default function App() {
       if (!res.ok) {
         throw new Error('Failed to create room');
       }
-      
+      socket.emit("create room", roomID);
+
+      socket.on("assign-admin",()=>{
+        adminID=roomID;
+      })
+
       const data = await res.json();
       console.log('Room created:', data);
       // Redirect or update UI as needed
@@ -33,7 +53,7 @@ export default function App() {
   const joinRoom = async () => {
     try {
       // Sending the roomID to the backend
-      const res = await fetch('http://localhost:5000/JoinRoom', {
+      const res = await fetch('http://localhost:5000/joinRoom', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomID })
@@ -42,7 +62,8 @@ export default function App() {
       if (!res.ok) {
         throw new Error('Failed to join room');
       }
-      
+      socket.emit("join room",roomID);
+
       const data = await res.json();
       console.log('Joined room:', data);
       // Redirect or update UI as needed
