@@ -6,45 +6,42 @@ const cors = require('cors');
 const app = express();
 const httpServer = http.createServer(app);
 
-// Add JSON parsing middleware
 app.use(express.json());
 
-// Add CORS middleware
 app.use(cors({
-  origin: 'http://localhost:3000', 
+  origin: 'http://localhost:3000',
   methods: ['GET', 'POST'],
   credentials: true
 }));
 
+const rooms = {};
 
-// Map to track rooms and number of users
-const roomMap = new Map();
-
-// Create Room Route
 app.post('/newRoom', (req, res) => {
   const { roomID } = req.body;
 
-  if (roomMap.has(roomID)) {
+  if (rooms[roomID]) {
     res.status(500).json("The room already exists");
   } else {
-    roomMap.set(roomID, 1);
+    rooms[roomID] = {
+      adminID: null,
+      users: {},
+      gameStarted: false
+    };
     res.status(200).json("Room has been created");
   }
 });
 
-// Join Room Route
 app.post('/joinRoom', (req, res) => {
   const { roomID } = req.body;
 
-  if (!roomMap.has(roomID)) {
+  if (!rooms[roomID]) {
     return res.status(500).json("The room does not exist");
   }
 
-  if (roomMap.get(roomID) >= 6) {
-    return res.status(500).json("The room is full");
+  const numUsers = Object.keys(rooms[roomID].users).length;
+  if (numUsers >= 6 && !rooms[roomID].gameStarted) {
+    return res.status(500).json("The room is full or the game has already started");
   }
-
-  roomMap.set(roomID, roomMap.get(roomID) + 1);
   res.status(200).json("The user has joined the room");
 });
 
@@ -59,16 +56,63 @@ const io = new Server(httpServer, {
 io.on("connection", (socket) => {
   console.log("Client connected:", socket.id);
 
-
   socket.on("create room", (roomID) => {
-      socket.join(roomID); 
-      socket.emit("assign-admin");
-      console.log(` Room ${roomID} created and socket ${socket.id} joined it`);
-  });
-  socket.on("join room",(roomID)=>{
     socket.join(roomID);
-    console.log(`client with socket id ${socket.id} has joined the room with ID: ${roomID}`);
+    rooms[roomID] = {
+      adminID: socket.id,
+      users: {
+        [socket.id]: { username: null }
+      },
+      gameStarted: false
+    };
+    console.log(`Room: ${roomID} has ${Object.keys(rooms[roomID].users)}`);
+  });
+
+  socket.on("join room", (roomID) => {
+    if (rooms[roomID]) {
+      socket.join(roomID);
+      rooms[roomID].users[socket.id] = { username: null };
+      console.log(`Client with ${socket.id} has joined the room ${roomID}`);
+      console.log(`Room: ${roomID} has ${Object.keys(rooms[roomID].users)}`);
+    }
+  });
+
+  socket.on("current_room",({roomID})=>{
+    io.to(roomID).emit("room_status", {
+      users: Object.entries(rooms[roomID].users).map(([socketID, user]) => ({//wtf is going on here
+        socketID,
+        username: user.username || 'Unnamed',
+      })),
+      roomID,
+      adminID: rooms[roomID].adminID,
+    });
+  });
+
+  socket.on("set_username", ({ username, roomID }) => {
+    if (rooms[roomID] && rooms[roomID].users[socket.id]) {
+      rooms[roomID].users[socket.id].username = username;
+    }
+  });
+  
+  socket.on("start_game",(roomID)=>{
+    rooms[roomID].gameStarted=true;
   })
+
+  //this needs change, try if we can get the roomID that the socket has disconnected from so we can have a O(1) lookup
+  socket.on("disconnect", () => {
+    for (const roomID in rooms) {
+      if (rooms[roomID].users[socket.id]) {
+        delete rooms[roomID].users[socket.id];
+        if (socket.id === rooms[roomID].adminID) {
+          rooms[roomID].adminID = null;
+        }
+        if (Object.keys(rooms[roomID].users).length === 0) {
+          delete rooms[roomID];
+        }
+        break;
+      }
+    }
+  });
 });
 
 httpServer.listen(5000, () => {

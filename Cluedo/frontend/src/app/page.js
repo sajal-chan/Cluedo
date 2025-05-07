@@ -2,12 +2,12 @@
 import { useState,useEffect } from 'react';
 import {socket} from './socket';
 import {io} from 'socket.io-client';
-
+import{useRouter} from 'next/navigation';
 
 export default function App() {
   const [roomID, setRoomID] = useState('');
   let adminID=-1;
-
+  const router=useRouter();
   const handleChange = (e) => {
     setRoomID(e.target.value); 
   };
@@ -37,12 +37,10 @@ export default function App() {
       }
       socket.emit("create room", roomID);
 
-      socket.on("assign-admin",()=>{
-        adminID=roomID;
-      })
-
       const data = await res.json();
       console.log('Room created:', data);
+
+      router.push(`/lobby/${roomID}`);
       // Redirect or update UI as needed
     } catch (error) {
       console.log(error);
@@ -66,6 +64,8 @@ export default function App() {
 
       const data = await res.json();
       console.log('Joined room:', data);
+
+      router.push(`/lobby/${roomID}`);
       // Redirect or update UI as needed
     } catch (error) {
       console.log(error);
