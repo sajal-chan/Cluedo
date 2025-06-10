@@ -14,7 +14,7 @@ app.use(cors({
   credentials: true
 }));
 
-const rooms = {};
+const rooms = {};//need to completely change the structure of this, make this uuid centric
 
 app.post('/newRoom', (req, res) => {
   const { roomID } = req.body;
@@ -54,42 +54,40 @@ const io = new Server(httpServer, {
 });
 
 io.on("connection", (socket) => {
-  console.log("Client connected:", socket.id);
+  // console.log("Client connected:", socket.id);
 
-  socket.on("create room", (roomID) => {
+  socket.on("create room", ({roomID,userID}) => {
     socket.join(roomID);
     rooms[roomID] = {
-      adminID: socket.id,
+      adminID: userID,
       users: {
-        [socket.id]: { username: null }
+        [userID]: { username: null }
       },
       gameStarted: false
     };
+    console.log(`user ${userID} has created the room`);
     console.log(`Room: ${roomID} has ${Object.keys(rooms[roomID].users)}`);
   });
 
-  socket.on("join room", (roomID) => {
+  socket.on("join room", ({roomID,userID}) => {
     if (rooms[roomID]) {
       socket.join(roomID);
-      rooms[roomID].users[socket.id] = { username: null };
-      console.log(`Client with ${socket.id} has joined the room ${roomID}`);
+      rooms[roomID].users[userID] = { username: null };
+      console.log(`Client with ${userID} has joined the room ${roomID}`);
       console.log(`Room: ${roomID} has ${Object.keys(rooms[roomID].users)}`);
     }
   });
 
   socket.on("current_room",({roomID})=>{
     io.to(roomID).emit("room_status", {
-      users: Object.entries(rooms[roomID].users).map(([socketID, user]) => ({//wtf is going on here
-        socketID,
-        username: user.username || 'Unnamed',
-      })),
+      users: Object.entries(rooms[roomID].users),
       roomID,
       adminID: rooms[roomID].adminID,
     });
   });
 
-  socket.on("set_username", ({ username, roomID }) => {
-    if (rooms[roomID] && rooms[roomID].users[socket.id]) {
+  socket.on("set_username", ({ username, roomID,userID }) => {
+    if (rooms[roomID] && rooms[roomID].users[userID]) {
       rooms[roomID].users[socket.id].username = username;
     }
   });

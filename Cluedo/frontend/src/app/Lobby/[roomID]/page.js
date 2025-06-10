@@ -1,9 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { io } from 'socket.io-client';
+import { socket } from './socket';
 import { useParams } from 'next/navigation';
 
-const socket = io('http://localhost:5000');
 
 export default function LobbyPage() {
   const roomID = useParams().roomID;
@@ -12,11 +11,11 @@ export default function LobbyPage() {
   const [users, setUsers] = useState([]); //used for rendering the users list
   const [adminID, setAdminID] = useState(null);
   const [myID, setMyID] = useState(null);
-
+  
 
 
   useEffect(() => {
-    
+    console.log(roomID);
     socket.emit('join room', roomID);
 
     socket.on('connect', () => {
@@ -51,6 +50,8 @@ export default function LobbyPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-6 space-y-6">
+
+    
       {!isNameSet ? (
         <div className="flex flex-col items-center space-y-4">
           <input

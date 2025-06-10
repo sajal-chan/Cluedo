@@ -1,27 +1,36 @@
 'use client'
 import { useState,useEffect } from 'react';
 import {socket} from './socket';
-import {io} from 'socket.io-client';
 import{useRouter} from 'next/navigation';
+import{v4 as uuidv4} from'uuid';
+
 
 export default function App() {
+  let userID;
   const [roomID, setRoomID] = useState('');
-  let adminID=-1;
   const router=useRouter();
   const handleChange = (e) => {
     setRoomID(e.target.value); 
   };
 
   useEffect(() => {
-
     socket.on("connect", () => {
-      console.log("Connected to server with ID:", socket.id);
+      console.log("Socket ID:", socket.id);
     });
     return () => {
       socket.off("connect");
     };
 
   }, []);//only makes a new connection on the page re-render
+
+  const UUID = () => {
+    let userID = localStorage.getItem('userID');
+    if (!userID) {
+      userID = uuidv4();
+      localStorage.setItem('userID', userID);
+    }
+    return userID;
+  };
 
   const createRoom = async () => {
     try {
@@ -35,12 +44,16 @@ export default function App() {
       if (!res.ok) {
         throw new Error('Failed to create room');
       }
-      socket.emit("create room", roomID);
+
+      const userID=UUID();
+      socket.emit("create room", ({roomID,userID}));
+      
+      
 
       const data = await res.json();
       console.log('Room created:', data);
 
-      router.push(`/lobby/${roomID}`);
+      router.push(`/Lobby/${roomID}`);
       // Redirect or update UI as needed
     } catch (error) {
       console.log(error);
@@ -60,12 +73,14 @@ export default function App() {
       if (!res.ok) {
         throw new Error('Failed to join room');
       }
-      socket.emit("join room",roomID);
+
+      const userID=UUID();
+      socket.emit("join room",({roomID,userID}));
 
       const data = await res.json();
       console.log('Joined room:', data);
 
-      router.push(`/lobby/${roomID}`);
+      router.push(`/Lobby/${roomID}`);
       // Redirect or update UI as needed
     } catch (error) {
       console.log(error);
